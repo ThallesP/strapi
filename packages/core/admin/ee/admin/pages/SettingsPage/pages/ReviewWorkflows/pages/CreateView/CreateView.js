@@ -18,7 +18,7 @@ import { useHistory } from 'react-router-dom';
 import { useContentTypes } from '../../../../../../../../admin/src/hooks/useContentTypes';
 import { useInjectReducer } from '../../../../../../../../admin/src/hooks/useInjectReducer';
 import { useLicenseLimits } from '../../../../../../hooks';
-import { addStage, resetWorkflow } from '../../actions';
+import { addStage, resetWorkflow, setContentTypes, setIsLoading } from '../../actions';
 import * as Layout from '../../components/Layout';
 import * as LimitsModal from '../../components/LimitsModal';
 import { Stages } from '../../components/Stages';
@@ -29,7 +29,8 @@ import {
   REDUX_NAMESPACE,
 } from '../../constants';
 import { useReviewWorkflows } from '../../hooks/useReviewWorkflows';
-import { reducer, initialState } from '../../reducer';
+import { reducer } from '../../reducer';
+import { selectIsLoading, selectIsWorkflowDirty, selectCurrentWorkflow } from '../../selectors';
 import { validateWorkflow } from '../../utils/validateWorkflow';
 
 export function ReviewWorkflowsCreateView() {
@@ -39,13 +40,11 @@ export function ReviewWorkflowsCreateView() {
   const { formatAPIError } = useAPIErrorHandler();
   const dispatch = useDispatch();
   const toggleNotification = useNotification();
-  const { collectionTypes, singleTypes, isLoading: isLoadingModels } = useContentTypes();
+  const { collectionTypes, singleTypes, isLoading: isLoadingContentTypes } = useContentTypes();
   const { isLoading: isWorkflowLoading, meta, workflows } = useReviewWorkflows();
-  const {
-    clientState: {
-      currentWorkflow: { data: currentWorkflow, isDirty: currentWorkflowIsDirty },
-    },
-  } = useSelector((state) => state?.[REDUX_NAMESPACE] ?? initialState);
+  const isLoading = useSelector(selectIsLoading);
+  const currentWorkflowIsDirty = useSelector(selectIsWorkflowDirty);
+  const currentWorkflow = useSelector(selectCurrentWorkflow);
   const [showLimitModal, setShowLimitModal] = React.useState(false);
   const { isLoading: isLicenseLoading, getFeature } = useLicenseLimits();
   const [initialErrors, setInitialErrors] = React.useState(null);
@@ -54,7 +53,7 @@ export function ReviewWorkflowsCreateView() {
   const limits = getFeature('review-workflows');
   const contentTypesFromOtherWorkflows = workflows.flatMap((workflow) => workflow.contentTypes);
 
-  const { mutateAsync, isLoading } = useMutation(
+  const { mutateAsync, isLoading: isLoadingMutation } = useMutation(
     async ({ workflow }) => {
       const {
         data: { data },
@@ -167,13 +166,25 @@ export function ReviewWorkflowsCreateView() {
   React.useEffect(() => {
     dispatch(resetWorkflow());
 
+    if (!isLoadingContentTypes) {
+      dispatch(setContentTypes({ collectionTypes, singleTypes }));
+    }
+
+    dispatch(setIsLoading(isLoadingContentTypes));
+
     // Create an empty default stage
     dispatch(
       addStage({
         name: '',
       })
     );
-  }, [dispatch]);
+
+    if (!isLoadingContentTypes) {
+      dispatch(setContentTypes({ collectionTypes, singleTypes }));
+    }
+    // TODO: content-types are unstable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, isLoadingContentTypes]);
 
   /**
    * If the current license has a limit:
@@ -225,7 +236,7 @@ export function ReviewWorkflowsCreateView() {
                 type="submit"
                 size="M"
                 disabled={!currentWorkflowIsDirty}
-                isLoading={isLoading}
+                isLoading={isLoadingMutation}
               >
                 {formatMessage({
                   id: 'global.save',
@@ -247,7 +258,7 @@ export function ReviewWorkflowsCreateView() {
           />
           <Layout.Root>
             <Flex alignItems="stretch" direction="column" gap={7}>
-              {isLoadingModels ? (
+              {isLoading ? (
                 <Loader>
                   {formatMessage({
                     id: 'Settings.review-workflows.page.isLoading',
@@ -256,10 +267,7 @@ export function ReviewWorkflowsCreateView() {
                 </Loader>
               ) : (
                 <Flex alignItems="stretch" direction="column" gap={7}>
-                  <WorkflowAttributes
-                    contentTypes={{ collectionTypes, singleTypes }}
-                    workflows={workflows}
-                  />
+                  <WorkflowAttributes />
                   <Stages stages={formik.values?.stages} />
                 </Flex>
               )}

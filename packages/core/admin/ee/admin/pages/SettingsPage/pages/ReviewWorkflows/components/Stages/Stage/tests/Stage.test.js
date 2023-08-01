@@ -10,6 +10,7 @@ import { IntlProvider } from 'react-intl';
 import { Provider } from 'react-redux';
 
 import configureStore from '../../../../../../../../../../admin/src/core/store/configureStore';
+import { setRoles } from '../../../../actions';
 import { STAGE_COLOR_DEFAULT } from '../../../../constants';
 import { reducer } from '../../../../reducer';
 import { Stage } from '../Stage';
@@ -30,6 +31,9 @@ const ComponentFixture = ({
   ...props
 }) => {
   const store = configureStore([], [reducer]);
+
+  // TODO
+  store.dispatch(setRoles([]));
 
   const formik = useFormik({
     enableReinitialize: true,
@@ -74,9 +78,11 @@ describe('Admin | Settings | Review Workflow | Stage', () => {
 
     expect(queryByRole('textbox')).toBeInTheDocument();
     expect(getByRole('textbox').value).toBe('something');
+    // Expect the accordion header to have the same value as the textbox
+    expect(getByRole('button', { name: /something/i }));
     expect(getByRole('textbox').getAttribute('name')).toBe('stages.0.name');
 
-    expect(getByRole('combobox')).toHaveTextContent('Blue');
+    expect(getByRole('combobox', { name: /color/i })).toHaveTextContent('Blue');
 
     expect(
       queryByRole('button', {
@@ -132,6 +138,10 @@ describe('Admin | Settings | Review Workflow | Stage', () => {
     await user.click(container.querySelector('button[aria-expanded]'));
 
     expect(getByRole('textbox')).toHaveAttribute('disabled');
-    expect(getByRole('combobox')).toHaveAttribute('data-disabled');
+    expect(getByRole('combobox', { name: /color/i })).toHaveAttribute('data-disabled');
   });
+
+  it.skip('should render a list of available roles', () => {});
+
+  it.skip('should not render super admins as part of the roles select', () => {});
 });

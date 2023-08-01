@@ -20,7 +20,7 @@ import { useContentTypes } from '../../../../../../../../admin/src/hooks/useCont
 import { useInjectReducer } from '../../../../../../../../admin/src/hooks/useInjectReducer';
 import { selectAdminPermissions } from '../../../../../../../../admin/src/pages/App/selectors';
 import { useLicenseLimits } from '../../../../../../hooks';
-import { resetWorkflow, setWorkflow } from '../../actions';
+import { resetWorkflow, setIsLoading, setWorkflow, setContentTypes } from '../../actions';
 import * as Layout from '../../components/Layout';
 import * as LimitsModal from '../../components/LimitsModal';
 import { Stages } from '../../components/Stages';
@@ -31,7 +31,14 @@ import {
   REDUX_NAMESPACE,
 } from '../../constants';
 import { useReviewWorkflows } from '../../hooks/useReviewWorkflows';
-import { reducer, initialState } from '../../reducer';
+import { reducer } from '../../reducer';
+import {
+  selectIsWorkflowDirty,
+  selectCurrentWorkflow,
+  selectHasDeletedServerStages,
+  selectIsLoading,
+  selectServerState,
+} from '../../selectors';
 import { validateWorkflow } from '../../utils/validateWorkflow';
 
 export function ReviewWorkflowsEditView() {
@@ -42,24 +49,13 @@ export function ReviewWorkflowsEditView() {
   const { put } = useFetchClient();
   const { formatAPIError } = useAPIErrorHandler();
   const toggleNotification = useNotification();
-  const {
-    isLoading: isWorkflowLoading,
-    meta,
-    workflows,
-    status: workflowStatus,
-    refetch,
-  } = useReviewWorkflows();
-  const { collectionTypes, singleTypes, isLoading: isLoadingModels } = useContentTypes();
-  const {
-    status,
-    clientState: {
-      currentWorkflow: {
-        data: currentWorkflow,
-        isDirty: currentWorkflowIsDirty,
-        hasDeletedServerStages,
-      },
-    },
-  } = useSelector((state) => state?.[REDUX_NAMESPACE] ?? initialState);
+  const { isLoading: isLoadingWorkflow, meta, workflows, refetch } = useReviewWorkflows();
+  const { collectionTypes, singleTypes, isLoading: isLoadingContentTypes } = useContentTypes();
+  const serverState = useSelector(selectServerState);
+  const currentWorkflowIsDirty = useSelector(selectIsWorkflowDirty);
+  const currentWorkflow = useSelector(selectCurrentWorkflow);
+  const hasDeletedServerStages = useSelector(selectHasDeletedServerStages);
+  const isLoading = useSelector(selectIsLoading);
   const {
     allowedActions: { canDelete, canUpdate },
   } = useRBAC(permissions.settings['review-workflows']);
@@ -73,7 +69,7 @@ export function ReviewWorkflowsEditView() {
     .filter((workflow) => workflow.id !== parseInt(workflowId, 10))
     .flatMap((workflow) => workflow.contentTypes);
 
-  const { mutateAsync, isLoading } = useMutation(
+  const { mutateAsync, isLoading: isLoadingMutation } = useMutation(
     async ({ workflow }) => {
       const {
         data: { data },
@@ -98,7 +94,25 @@ export function ReviewWorkflowsEditView() {
     setInitialErrors(null);
 
     try {
-      const res = await mutateAsync({ workflow });
+      const res = await mutateAsync({
+        workflow: {
+          ...workflow,
+
+          // compare permissions of stages and only submit the ones which have
+          // changed; this enables partial updates e.g. for users who don't have
+          // permissions to see roles
+          stages: workflow.stages.map((stage) => {
+            const hasUpdatedPermissions = (stage.permissions ?? []).every(
+              (stage) => stage === serverState.workflow.stages.includes(stage.id)
+            );
+
+            return {
+              ...stage,
+              permissions: hasUpdatedPermissions ? stage.permissions : undefined,
+            };
+          }),
+        },
+      });
 
       return res;
     } catch (error) {
@@ -194,14 +208,26 @@ export function ReviewWorkflowsEditView() {
   const limits = getFeature('review-workflows');
 
   React.useEffect(() => {
-    dispatch(setWorkflow({ status: workflowStatus, data: workflow }));
+    if (!isLoadingWorkflow) {
+      dispatch(setWorkflow({ workflow }));
+    }
+
+    if (!isLoadingContentTypes) {
+      dispatch(setContentTypes({ collectionTypes, singleTypes }));
+    }
+
+    dispatch(setIsLoading(isLoadingWorkflow && isLoadingContentTypes));
+
+    // setRoles([]);
 
     // reset the state to the initial state to avoid flashes if a user
     // navigates from an edit-view to a create-view
     return () => {
       dispatch(resetWorkflow());
     };
-  }, [workflowStatus, workflow, dispatch]);
+    // TODO: content types are unstable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflow, dispatch, isLoadingContentTypes, isLoadingWorkflow]);
 
   /**
    * If the current license has a limit:
@@ -217,7 +243,7 @@ export function ReviewWorkflowsEditView() {
    */
 
   React.useEffect(() => {
-    if (!isWorkflowLoading && !isLicenseLoading) {
+    if (!isLoadingWorkflow && !isLicenseLoading) {
       if (
         limits?.[CHARGEBEE_WORKFLOW_ENTITLEMENT_NAME] &&
         meta?.workflowCount > parseInt(limits[CHARGEBEE_WORKFLOW_ENTITLEMENT_NAME], 10)
@@ -234,7 +260,7 @@ export function ReviewWorkflowsEditView() {
   }, [
     currentWorkflow.stages.length,
     isLicenseLoading,
-    isWorkflowLoading,
+    isLoadingWorkflow,
     limits,
     meta?.workflowCount,
     meta.workflowsTotal,
@@ -259,7 +285,7 @@ export function ReviewWorkflowsEditView() {
                   disabled={!currentWorkflowIsDirty}
                   // if the confirm dialog is open the loading state is on
                   // the confirm button already
-                  loading={!Object.keys(savePrompts).length > 0 && isLoading}
+                  loading={!Object.keys(savePrompts).length > 0 && isLoadingMutation}
                 >
                   {formatMessage({
                     id: 'global.save',
@@ -282,7 +308,7 @@ export function ReviewWorkflowsEditView() {
           />
 
           <Layout.Root>
-            {isLoadingModels || status === 'loading' ? (
+            {isLoading ? (
               <Flex justifyContent="center">
                 <Loader>
                   {formatMessage({
@@ -293,12 +319,7 @@ export function ReviewWorkflowsEditView() {
               </Flex>
             ) : (
               <Flex alignItems="stretch" direction="column" gap={7}>
-                <WorkflowAttributes
-                  canUpdate={canUpdate}
-                  contentTypes={{ collectionTypes, singleTypes }}
-                  currentWorkflow={currentWorkflow}
-                  workflows={workflows}
-                />
+                <WorkflowAttributes canUpdate={canUpdate} />
                 <Stages
                   canDelete={canDelete}
                   canUpdate={canUpdate}

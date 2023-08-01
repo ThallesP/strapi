@@ -57,6 +57,14 @@ export async function validateWorkflow({ values, formatMessage }) {
               })
             )
             .matches(/^#(?:[0-9a-fA-F]{3}){1,2}$/i),
+
+          permissions: yup.array(yup.number()).min(
+            1,
+            formatMessage({
+              id: 'Settings.review-workflows.validation.stage.permissions',
+              defaultMessage: 'Must be either an array or undefined',
+            })
+          ),
         })
       )
       .min(1),
