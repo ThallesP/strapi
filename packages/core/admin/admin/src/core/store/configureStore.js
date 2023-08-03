@@ -1,6 +1,6 @@
 import { applyMiddleware, combineReducers, compose, createStore } from 'redux';
 
-const configureStore = (appMiddlewares, appReducers) => {
+const configureStore = (appMiddlewares, appReducers, preloadedState = {}) => {
   let composeEnhancers = compose;
 
   const middlewares = [];
@@ -20,7 +20,7 @@ const configureStore = (appMiddlewares, appReducers) => {
 
   const store = createStore(
     createReducer(appReducers, {}),
-    {},
+    preloadedState,
     composeEnhancers(applyMiddleware(...middlewares))
   );
 
