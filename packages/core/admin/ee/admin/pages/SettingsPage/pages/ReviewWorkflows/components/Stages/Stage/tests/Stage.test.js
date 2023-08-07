@@ -144,4 +144,8 @@ describe('Admin | Settings | Review Workflow | Stage', () => {
   it.skip('should render a list of available roles', () => {});
 
   it.skip('should not render super admins as part of the roles select', () => {});
+
+  it.skip('should apply the current permissions to all other stages', () => {});
+
+  it.skip('should not do anything if apply to all stages is cancelled', () => {});
 });
