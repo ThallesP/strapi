@@ -19,8 +19,9 @@ import {
   Typography,
   VisuallyHidden,
 } from '@strapi/design-system';
+import { Menu, MenuItem } from '@strapi/design-system/v2';
 import { ConfirmDialog, useNotification, useTracking } from '@strapi/helper-plugin';
-import { Drag, Trash } from '@strapi/icons';
+import { Drag, More } from '@strapi/icons';
 import { useField } from 'formik';
 import PropTypes from 'prop-types';
 import { getEmptyImage } from 'react-dnd-html5-backend';
@@ -30,7 +31,13 @@ import styled from 'styled-components';
 
 import { useDragAndDrop } from '../../../../../../../../../admin/src/content-manager/hooks';
 import { composeRefs } from '../../../../../../../../../admin/src/content-manager/utils';
-import { deleteStage, updateStage, updateStagePosition, updateStages } from '../../../actions';
+import {
+  cloneStage,
+  deleteStage,
+  updateStage,
+  updateStagePosition,
+  updateStages,
+} from '../../../actions';
 import { DRAG_DROP_TYPES } from '../../../constants';
 import { getAvailableStageColors, getStageColorByHex } from '../../../utils/colors';
 
@@ -224,18 +231,38 @@ export function Stage({
             action={
               (canDelete || canUpdate) && (
                 <Flex>
-                  {canDelete && (
-                    <IconButton
-                      background="transparent"
-                      icon={<Trash />}
-                      label={formatMessage({
-                        id: 'Settings.review-workflows.stage.delete',
-                        defaultMessage: 'Delete stage',
-                      })}
-                      noBorder
-                      onClick={() => dispatch(deleteStage(id))}
-                    />
-                  )}
+                  <Menu.Root>
+                    <Menu.Trigger size="S" endIcon={undefined} paddingLeft={2} paddingRight={2}>
+                      <More aria-hidden focusable={false} />
+                      <VisuallyHidden as="span">
+                        {formatMessage({
+                          id: '[tbdb].components.DynamicZone.more-actions',
+                          defaultMessage: 'More actions',
+                        })}
+                      </VisuallyHidden>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.SubRoot>
+                        {canUpdate && (
+                          <MenuItem onClick={() => dispatch(cloneStage(id))}>
+                            {formatMessage({
+                              id: 'Settings.review-workflows.stage.delete',
+                              defaultMessage: 'Duplicate stage',
+                            })}
+                          </MenuItem>
+                        )}
+
+                        {canDelete && (
+                          <MenuItem onClick={() => dispatch(deleteStage(id))}>
+                            {formatMessage({
+                              id: 'Settings.review-workflows.stage.delete',
+                              defaultMessage: 'Delete',
+                            })}
+                          </MenuItem>
+                        )}
+                      </Menu.SubRoot>
+                    </Menu.Content>
+                  </Menu.Root>
 
                   {canUpdate && (
                     <IconButton
