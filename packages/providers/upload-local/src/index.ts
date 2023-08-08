@@ -38,7 +38,7 @@ interface CheckFileSizeOptions {
 }
 
 export = {
-  init({ sizeLimit: providerOptionsSizeLimit }: InitOptions = {}) {
+  init({ sizeLimit: providerOptionsSizeLimit, uploadPath: providerUploadPath }: InitOptions = {}) {
     // TODO V5: remove providerOptions sizeLimit
     if (providerOptionsSizeLimit) {
       process.emitWarning(
@@ -47,7 +47,7 @@ export = {
     }
 
     // Ensure uploads folder exists
-    const uploadPath = path.resolve(strapi.dirs.static.public, UPLOADS_FOLDER_NAME);
+    const uploadPath = providerUploadPath ?? path.resolve(strapi.dirs.static.public, UPLOADS_FOLDER_NAME);
     if (!fse.pathExistsSync(uploadPath)) {
       throw new Error(
         `The upload folder (${uploadPath}) doesn't exist or is not accessible. Please make sure it exists.`
